@@ -42,7 +42,7 @@ export default function App() {
       <header className="border-b border-seam">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3.5">
           <div className="flex items-center gap-3">
-            <img src="/favicon.svg" className="h-8 w-8" alt="" />
+            <img src={`${import.meta.env.BASE_URL}favicon.svg`} className="h-8 w-8" alt="" />
             <span className="text-lg font-bold tracking-tight">
               swap<span className="text-cyan">desk</span>
             </span>
