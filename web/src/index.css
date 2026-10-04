@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+@theme {
+  --color-void: #06080e;
+  --color-hull: #0c1019;
+  --color-plate: #121827;
+  --color-seam: #1f2840;
+  --color-fog: #8a95b2;
+  --color-glow: #e8ecf7;
+  --color-cyan: #22d3ee;
+  --color-pink: #f472b6;
+  --color-lime: #a3e635;
+  --color-red: #fb7185;
+  --font-sans: "Rubik", system-ui, sans-serif;
+  --font-mono: "Space Mono", ui-monospace, monospace;
+}
+body { background: var(--color-void); color: var(--color-glow); font-family: var(--font-sans); }
+
+@layer components {
+  .deck { background: var(--color-hull); border: 1px solid var(--color-seam); border-radius: 12px; }
+  .tx { width: 100%; background: var(--color-plate); border: 1px solid var(--color-seam); border-radius: 8px; padding: .6rem .75rem; font-family: var(--font-mono); font-size: .85rem; color: var(--color-glow); }
+  .tx:focus { outline: none; border-color: var(--color-cyan); box-shadow: 0 0 0 3px rgb(34 211 238 / .15); }
+  .key { border-radius: 8px; padding: .6rem 1rem; font-weight: 600; font-size: .85rem; }
+  .key:disabled { opacity: .4; cursor: not-allowed; }
+  .key-cyan { background: var(--color-cyan); color: #032029; }
+  .key-pink { background: var(--color-pink); color: #2b0718; }
+  .key-dim { border: 1px solid var(--color-seam); color: var(--color-glow); }
+  .tag { font-family: var(--font-mono); font-size: .65rem; letter-spacing: .08em; text-transform: uppercase; padding: .15rem .45rem; border-radius: 4px; }
+}
