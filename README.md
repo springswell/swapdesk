@@ -63,6 +63,12 @@ stellar contract invoke --id <DESK> --source maker --network testnet -- \
   --allow_partial false --expires_at 1767312000
 ```
 
+## Documentation
+
+- [Architecture](docs/architecture.md)
+- [Otc playbook](docs/otc-playbook.md)
+- [Contributing](CONTRIBUTING.md) · [Security policy](SECURITY.md) · [Changelog](CHANGELOG.md)
+
 ## Glossary (new to Stellar?)
 
 - **OTC (over-the-counter)**: a trade agreed directly between two
