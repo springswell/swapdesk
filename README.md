@@ -63,6 +63,28 @@ stellar contract invoke --id <DESK> --source maker --network testnet -- \
   --allow_partial false --expires_at 1767312000
 ```
 
+## Web app
+
+![Swapdesk web app](docs/assets/web-app.png)
+
+An OTC trading desk at `web/`:
+
+- **Offer book**: open offers with remaining amounts, price, fill progress, private-offer tags and time left; plus "My offers" and full history. Token symbols are read from each token contract.
+- **Trade ticket**: enter what you pay and see exactly what you'll receive, computed with the contract's own rounding. One click fills atomically.
+- **Maker tools**: cancel to get the unfilled escrow back. Anyone can return an expired offer's escrow to its maker.
+- **Post an offer**: pick any two assets (XLM, the testnet DEMO token, or any contract id), set amounts, an optional private taker, partial fills and an expiry.
+
+```bash
+cd web
+npm install
+npm run dev        # http://localhost:5173
+```
+
+It talks to the contract deployed on **Stellar testnet** and signs with
+[Freighter](https://www.freighter.app) (switch it to Testnet). Point it at
+another deployment with `VITE_CONTRACT_ID` (see `web/.env.example`).
+`netlify.toml` at the repo root deploys it as-is.
+
 ## Documentation
 
 - [Architecture](docs/architecture.md)
