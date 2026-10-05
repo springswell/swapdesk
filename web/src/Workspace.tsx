@@ -54,7 +54,6 @@ export function Workspace({ wallet }: { wallet: Wallet }) {
     const ids = [...new Set(all.flatMap((o) => [o.sell_token, o.buy_token]))];
     const named = await Promise.all(ids.map(async (id) => [id, await symbolOf(id)] as const));
     setSymbols(Object.fromEntries(named));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     refresh();
