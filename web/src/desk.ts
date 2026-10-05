@@ -47,12 +47,7 @@ const getOffer = (id: number) => desk.read<Offer>("get_offer", [u64(id)]);
  */
 export async function scanOffers(batch = 10): Promise<Offer[]> {
   const out: Offer[] = [];
-  let count: number | null = null;
-  try {
-    count = Number(await desk.read<bigint>("offer_count"));
-  } catch {
-    count = null;
-  }
+  const count = await desk.read<bigint>("offer_count").then(Number, () => null);
   if (count !== null) {
     for (let start = 1; start <= count; start += batch) {
       const ids = Array.from({ length: Math.min(batch, count - start + 1) }, (_, i) => start + i);
