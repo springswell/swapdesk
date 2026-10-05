@@ -1,12 +1,25 @@
 import { useCallback, useEffect, useState } from "react";
 import { StrKey, xdr } from "@stellar/stellar-sdk";
-import { DEMO_TOKEN, desk, receiveFor, scanOffers, symbolOf, type Offer } from "./desk";
+import { DEMO_TOKEN, desk, KNOWN_TOKENS, priceOf, receiveFor, scanOffers, symbolOf, type Offer } from "./desk";
+import { routeParams } from "./lib/router";
 import { addr, bool, i128, none, txLink, u64, XLM_SAC } from "./lib/stellar";
 import { fromUnits, short, timeLeft, toUnits } from "./lib/format";
 import { useWallet } from "./lib/useWallet";
 import { useAction } from "./lib/useAction";
 
 export type Wallet = ReturnType<typeof useWallet>;
+
+/** Short contract id plus a badge for tokens we know, so a fake "USDC" is visible. */
+function TokenId({ token }: { token: string }) {
+  const known = KNOWN_TOKENS[token];
+  return (
+    <span className="ml-1 inline-flex items-center gap-1 align-middle font-mono text-[10px] text-fog" title={token}>
+      {short(token, 4)}
+      {known?.kind === "verified" && <span className="tag bg-lime/15 text-lime">✓</span>}
+      {known?.kind === "demo" && <span className="tag border border-seam">demo</span>}
+    </span>
+  );
+}
 
 function useSymbol(token: string) {
   const [s, setS] = useState(token === XLM_SAC ? "XLM" : "…");
@@ -18,22 +31,48 @@ function useSymbol(token: string) {
 
 export function Workspace({ wallet }: { wallet: Wallet }) {
   const [offers, setOffers] = useState<Offer[] | null>(null);
-  const [selected, setSelected] = useState<bigint | null>(null);
+  // #/app?offer=<id> opens that offer's ticket, so offers can be shared.
+  const [selected, setSelectedState] = useState<bigint | null>(() => {
+    const id = routeParams().get("offer");
+    return id && /^\d+$/.test(id) ? BigInt(id) : null;
+  });
+  const setSelected = (id: bigint | null | ((cur: bigint | null) => bigint | null)) =>
+    setSelectedState((cur) => {
+      const next = typeof id === "function" ? id(cur) : id;
+      if (next !== null && next !== cur) history.replaceState(null, "", `${window.location.pathname}#/app?offer=${next}`);
+      return next;
+    });
   const [filter, setFilter] = useState<"open" | "mine" | "all">("open");
+  const [pair, setPair] = useState("all");
+  const [sort, setSort] = useState<"newest" | "price-asc" | "price-desc">("newest");
+  const [symbols, setSymbols] = useState<Record<string, string>>({});
 
   const refresh = useCallback(async () => {
     const all = await scanOffers();
     setOffers(all);
     setSelected((cur) => cur ?? all.find((o) => o.status === 0)?.id ?? null);
+    const ids = [...new Set(all.flatMap((o) => [o.sell_token, o.buy_token]))];
+    const named = await Promise.all(ids.map(async (id) => [id, await symbolOf(id)] as const));
+    setSymbols(Object.fromEntries(named));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     refresh();
   }, [refresh]);
 
   const now = Date.now() / 1000;
-  const shown = (offers ?? []).filter((o) =>
-    filter === "open" ? o.status === 0 && Number(o.expires_at) > now : filter === "mine" ? o.maker === wallet.address : true,
-  );
+  const pairOf = (o: Offer) => `${o.sell_token}>${o.buy_token}`;
+  const pairs = [...new Set((offers ?? []).map(pairOf))];
+  const pairLabel = (p: string) => {
+    const [a, b] = p.split(">");
+    return `${symbols[a] ?? short(a)} → ${symbols[b] ?? short(b)}`;
+  };
+  const shown = (offers ?? [])
+    .filter((o) =>
+      filter === "open" ? o.status === 0 && Number(o.expires_at) > now : filter === "mine" ? o.maker === wallet.address : true,
+    )
+    .filter((o) => pair === "all" || pairOf(o) === pair)
+    .sort((a, b) => (sort === "price-asc" ? priceOf(a) - priceOf(b) : sort === "price-desc" ? priceOf(b) - priceOf(a) : 0));
   const current = offers?.find((o) => o.id === selected) ?? null;
 
   return (
@@ -49,7 +88,7 @@ export function Workspace({ wallet }: { wallet: Wallet }) {
         </p>
       </section>
 
-      <main className="mx-auto grid max-w-7xl gap-5 px-5 py-8 lg:grid-cols-[1.5fr_1fr]">
+      <div className="mx-auto grid max-w-7xl gap-5 px-5 py-8 lg:grid-cols-[1.5fr_1fr]">
         <section className="deck overflow-hidden">
           <div className="flex items-center justify-between border-b border-seam px-4 py-3">
             <div className="flex gap-1">
@@ -59,9 +98,24 @@ export function Workspace({ wallet }: { wallet: Wallet }) {
                 </button>
               ))}
             </div>
-            <button className="tag text-fog" onClick={refresh}>
-              ↻ refresh
-            </button>
+            <div className="flex items-center gap-2">
+              <select className="tx w-auto py-1 text-xs" value={pair} onChange={(e) => setPair(e.target.value)} aria-label="Filter by pair">
+                <option value="all">All pairs</option>
+                {pairs.map((p) => (
+                  <option key={p} value={p}>
+                    {pairLabel(p)}
+                  </option>
+                ))}
+              </select>
+              <select className="tx w-auto py-1 text-xs" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} aria-label="Sort">
+                <option value="newest">Newest</option>
+                <option value="price-asc">Price ↑</option>
+                <option value="price-desc">Price ↓</option>
+              </select>
+              <button className="tag text-fog" onClick={refresh}>
+                ↻ refresh
+              </button>
+            </div>
           </div>
           <div className="grid grid-cols-[60px_1fr_1fr_90px_80px] gap-2 border-b border-seam px-4 py-2 font-mono text-[11px] uppercase text-fog">
             <span>#</span>
@@ -81,7 +135,7 @@ export function Workspace({ wallet }: { wallet: Wallet }) {
           {current && <Ticket key={String(current.id)} o={current} wallet={wallet} onChange={refresh} />}
           <CreateOffer wallet={wallet} onCreated={(id) => (refresh(), setSelected(id))} />
         </aside>
-      </main>
+      </div>
 
     </div>
   );
@@ -90,7 +144,7 @@ export function Workspace({ wallet }: { wallet: Wallet }) {
 function OfferRow({ o, active, onClick }: { o: Offer; active: boolean; onClick: () => void }) {
   const sell = useSymbol(o.sell_token);
   const buy = useSymbol(o.buy_token);
-  const price = Number(o.buy_amount) / Number(o.sell_amount);
+  const price = priceOf(o);
   const filledPct = Number(((o.sell_amount - o.sell_remaining) * 100n) / o.sell_amount);
   const expired = Number(o.expires_at) * 1000 < Date.now();
   return (
@@ -101,11 +155,13 @@ function OfferRow({ o, active, onClick }: { o: Offer; active: boolean; onClick: 
       <span className="font-mono text-fog">{String(o.id)}</span>
       <span>
         <b className="text-pink">{fromUnits(o.sell_remaining)}</b> {sell}
+        <TokenId token={o.sell_token} />
         {o.taker && <span className="tag ml-2 border border-pink/40 text-pink">private</span>}
         {filledPct > 0 && o.status === 0 && <span className="ml-2 font-mono text-[11px] text-lime">{filledPct}% filled</span>}
       </span>
       <span>
         <b className="text-cyan">{fromUnits(o.buy_remaining)}</b> {buy}
+        <TokenId token={o.buy_token} />
       </span>
       <span className="text-right font-mono text-xs">{price.toPrecision(4)}</span>
       <span className={`text-right font-mono text-xs ${o.status ? "text-fog" : expired ? "text-red" : ""}`}>
@@ -159,7 +215,12 @@ function Ticket({ o, wallet, onChange }: { o: Offer; wallet: Wallet; onChange: (
     <section className="deck p-5">
       <div className="flex items-center justify-between">
         <h2 className="font-semibold">Offer #{String(o.id)}</h2>
-        <span className="font-mono text-xs text-fog">maker {short(o.maker)}</span>
+        <span className="flex items-center gap-3 font-mono text-xs text-fog">
+          <button className="underline" onClick={() => navigator.clipboard.writeText(window.location.href)}>
+            copy link
+          </button>
+          maker {short(o.maker)}
+        </span>
       </div>
       <p className="mt-3 text-2xl font-bold">
         <span className="text-pink">{fromUnits(o.sell_remaining)}</span> {sell} <span className="text-fog">for</span>{" "}
@@ -170,6 +231,19 @@ function Ticket({ o, wallet, onChange }: { o: Offer; wallet: Wallet; onChange: (
         {o.allow_partial ? "partial fills ok" : "fill in full"}
         {o.taker ? ` · private to ${short(o.taker)}` : ""}
       </p>
+      <dl className="mt-3 grid gap-1 rounded-md border border-seam p-3 font-mono text-[11px] text-fog">
+        {[
+          ["selling", o.sell_token],
+          ["for", o.buy_token],
+        ].map(([k, t]) => (
+          <div key={k} className="flex flex-wrap items-center justify-between gap-2">
+            <dt>{k}</dt>
+            <dd className="break-all text-glow">
+              {t} {KNOWN_TOKENS[t] ? <span className="text-lime">({KNOWN_TOKENS[t].label})</span> : <span className="text-red">(unverified)</span>}
+            </dd>
+          </div>
+        ))}
+      </dl>
 
       {o.status === 0 && !expired && !isMaker && (
         <div className="mt-5 space-y-3">

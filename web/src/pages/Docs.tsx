@@ -1,6 +1,7 @@
 import { CONTRACT_ID } from "../desk";
 import { contractLink } from "../lib/stellar";
-import { Link, useTitle } from "../lib/router";
+import { useEffect } from "react";
+import { Link, useSection, useTitle } from "../lib/router";
 
 const SECTIONS = [
   ["start", "Getting started"],
@@ -11,23 +12,19 @@ const SECTIONS = [
 
 export function Docs() {
   useTitle("Docs · swapdesk");
+  const section = useSection();
+  useEffect(() => {
+    if (section) document.getElementById(section)?.scrollIntoView({ behavior: "smooth" });
+  }, [section]);
   return (
     <div className="mx-auto grid max-w-6xl gap-12 px-5 py-14 lg:grid-cols-[210px_1fr]">
       <aside className="hidden lg:block">
         <nav className="sticky top-24 space-y-1 text-sm">
           <p className="mb-3 px-3 font-mono text-xs uppercase tracking-[0.2em] text-pink">On this page</p>
           {SECTIONS.map(([id, label]) => (
-            <a
-              key={id}
-              href="#/docs"
-              onClick={(e) => {
-                e.preventDefault();
-                document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className="block rounded-lg px-3 py-2 text-fog hover:bg-plate hover:text-glow"
-            >
+            <Link key={id} to={`/docs/${id}`} className="block rounded-lg px-3 py-2 text-fog hover:bg-plate hover:text-glow">
               {label}
-            </a>
+            </Link>
           ))}
         </nav>
       </aside>
@@ -158,6 +155,21 @@ const REFERENCE: [string, string, string][] = [
   ],
   [
     "get_offer(offer_id)",
+    "—",
+    "Read state"
+  ],
+  [
+    "set_min_fill(offer_id, min_fill)",
+    "maker",
+    "Smallest partial fill accepted; the final remainder is exempt"
+  ],
+  [
+    "reprice(offer_id, buy_amount)",
+    "maker",
+    "New price for the unsold remainder, same id and escrow"
+  ],
+  [
+    "offer_count() · min_fill(offer_id)",
     "—",
     "Read state"
   ]
