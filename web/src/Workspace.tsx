@@ -16,19 +16,98 @@ function useSymbol(token: string) {
   return s;
 }
 
+export function getOfferIdFromUrl(
+  search: string = typeof window !== "undefined" ? window.location.search : "",
+  hash: string = typeof window !== "undefined" ? window.location.hash : "",
+): bigint | null {
+  const qIdx = hash.indexOf("?");
+  if (qIdx !== -1) {
+    const hashParams = new URLSearchParams(hash.slice(qIdx));
+    const offer = hashParams.get("offer");
+    if (offer && /^\d+$/.test(offer)) {
+      try {
+        return BigInt(offer);
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  if (search) {
+    const searchParams = new URLSearchParams(search);
+    const offer = searchParams.get("offer");
+    if (offer && /^\d+$/.test(offer)) {
+      try {
+        return BigInt(offer);
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  return null;
+}
+
+export function getOfferUrl(
+  offerId: bigint | number | string,
+  baseHref: string = typeof window !== "undefined" ? window.location.href : "",
+): string {
+  if (baseHref) {
+    try {
+      const url = new URL(baseHref);
+      url.search = "";
+      url.hash = `/app?offer=${offerId}`;
+      return url.href;
+    } catch {
+      // fallback
+    }
+  }
+  return `#/app?offer=${offerId}`;
+}
+
 export function Workspace({ wallet }: { wallet: Wallet }) {
   const [offers, setOffers] = useState<Offer[] | null>(null);
-  const [selected, setSelected] = useState<bigint | null>(null);
+  const [selected, setSelected] = useState<bigint | null>(() => getOfferIdFromUrl());
   const [filter, setFilter] = useState<"open" | "mine" | "all">("open");
 
   const refresh = useCallback(async () => {
     const all = await scanOffers();
     setOffers(all);
-    setSelected((cur) => cur ?? all.find((o) => o.status === 0)?.id ?? null);
+    const fromUrl = getOfferIdFromUrl();
+    setSelected((cur) => {
+      const target = cur ?? fromUrl;
+      if (target !== null && all.some((o) => o.id === target)) {
+        return target;
+      }
+      return all.find((o) => o.status === 0)?.id ?? null;
+    });
+    if (fromUrl !== null) {
+      const target = all.find((o) => o.id === fromUrl);
+      if (target && (target.status !== 0 || Number(target.expires_at) <= Date.now() / 1000)) {
+        setFilter("all");
+      }
+    }
   }, []);
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    const onHashChange = () => {
+      const id = getOfferIdFromUrl();
+      if (id !== null) {
+        setSelected(id);
+        if (offers) {
+          const target = offers.find((o) => o.id === id);
+          if (target && (target.status !== 0 || Number(target.expires_at) <= Date.now() / 1000)) {
+            setFilter("all");
+          }
+        }
+      }
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, [offers]);
 
   const now = Date.now() / 1000;
   const shown = (offers ?? []).filter((o) =>
@@ -135,6 +214,7 @@ function Ticket({ o, wallet, onChange }: { o: Offer; wallet: Wallet; onChange: (
   const sell = useSymbol(o.sell_token);
   const buy = useSymbol(o.buy_token);
   const [pay, setPay] = useState(fromUnits(o.buy_remaining).replace(/,/g, ""));
+  const [copied, setCopied] = useState(false);
   const act = useAction();
   let payUnits = 0n;
   try {
@@ -146,6 +226,42 @@ function Ticket({ o, wallet, onChange }: { o: Offer; wallet: Wallet; onChange: (
   const expired = Number(o.expires_at) * 1000 < Date.now();
   const isMaker = wallet.address === o.maker;
   const blockedPrivate = !!o.taker && wallet.address !== o.taker;
+
+  const copyLink = async () => {
+    const url = getOfferUrl(o.id);
+    let ok = false;
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(url);
+        ok = true;
+      } catch {
+        ok = false;
+      }
+    }
+    if (!ok && typeof document !== "undefined") {
+      try {
+        const input = document.createElement("textarea");
+        input.value = url;
+        input.style.position = "fixed";
+        input.style.opacity = "0";
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand("copy");
+        document.body.removeChild(input);
+        ok = true;
+      } catch {
+        // ignore
+      }
+    }
+    try {
+      window.history.replaceState(null, "", url);
+    } catch {
+      // ignore
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const run = (label: string, method: string, args: xdr.ScVal[], text: string) =>
     act.run(label, async () => {
       const me = wallet.address ?? (await wallet.connect());
@@ -158,7 +274,16 @@ function Ticket({ o, wallet, onChange }: { o: Offer; wallet: Wallet; onChange: (
   return (
     <section className="deck p-5">
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold">Offer #{String(o.id)}</h2>
+        <div className="flex items-center gap-2.5">
+          <h2 className="font-semibold">Offer #{String(o.id)}</h2>
+          <button
+            type="button"
+            className="tag border border-seam text-fog hover:border-cyan hover:text-cyan transition cursor-pointer"
+            onClick={copyLink}
+          >
+            {copied ? "Copied!" : "Copy link"}
+          </button>
+        </div>
         <span className="font-mono text-xs text-fog">maker {short(o.maker)}</span>
       </div>
       <p className="mt-3 text-2xl font-bold">

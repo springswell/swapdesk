@@ -14,5 +14,6 @@ describe("hash route parsing", () => {
   it("keeps the path and drops query strings", () => {
     expect(parse("#/docs")).toBe("/docs");
     expect(parse("#/app?vault=C123")).toBe("/app");
+    expect(parse("#/app?offer=7")).toBe("/app");
   });
 });
