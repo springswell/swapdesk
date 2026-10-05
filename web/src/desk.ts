@@ -1,3 +1,4 @@
+import { Asset, Networks } from "@stellar/stellar-sdk";
 import { client, u64, XLM_SAC } from "./lib/stellar";
 
 export const CONTRACT_ID = import.meta.env.VITE_CONTRACT_ID ?? "CD3VOYQK6YW4567ARVWN4MAQ6XFJQNFVWL3VR5MZGNMLV2VOPF6B43KL";
@@ -38,17 +39,50 @@ export function receiveFor(o: Offer, pay: bigint): bigint {
   return (o.sell_amount * pay) / o.buy_amount;
 }
 
-export async function scanOffers(max = 100): Promise<Offer[]> {
+const getOffer = (id: number) => desk.read<Offer>("get_offer", [u64(id)]);
+
+/**
+ * Newest first. Uses offer_count with parallel batches when available;
+ * older deployments fall back to probing ids until the first gap.
+ */
+export async function scanOffers(batch = 10): Promise<Offer[]> {
   const out: Offer[] = [];
-  for (let id = 1; id <= max; id++) {
+  let count: number | null = null;
+  try {
+    count = Number(await desk.read<bigint>("offer_count"));
+  } catch {
+    count = null;
+  }
+  if (count !== null) {
+    for (let start = 1; start <= count; start += batch) {
+      const ids = Array.from({ length: Math.min(batch, count - start + 1) }, (_, i) => start + i);
+      const got = await Promise.allSettled(ids.map(getOffer));
+      for (const r of got) if (r.status === "fulfilled") out.push(r.value);
+    }
+    return out.reverse();
+  }
+  for (let id = 1; ; id++) {
     try {
-      out.push(await desk.read<Offer>("get_offer", [u64(id)]));
+      out.push(await getOffer(id));
     } catch {
       break;
     }
   }
   return out.reverse();
 }
+
+/** Token contracts we can vouch for, so look-alike symbols stand out. */
+export const KNOWN_TOKENS: Record<string, { label: string; kind: "verified" | "demo" }> = {
+  [XLM_SAC]: { label: "native XLM", kind: "verified" },
+  [new Asset("USDC", "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5").contractId(Networks.TESTNET)]: {
+    label: "Circle USDC (testnet)",
+    kind: "verified",
+  },
+  [DEMO_TOKEN]: { label: "swapdesk demo token", kind: "demo" },
+};
+
+/** Price of one sell-token unit in buy-token units. */
+export const priceOf = (o: Offer) => Number(o.buy_amount) / Number(o.sell_amount);
 
 const symbols = new Map<string, Promise<string>>([[XLM_SAC, Promise.resolve("XLM")]]);
 /** Token symbol from the token contract itself (cached). */
