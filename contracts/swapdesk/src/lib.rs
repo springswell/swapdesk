@@ -54,6 +54,8 @@ pub struct Offer {
 pub enum DataKey {
     NextId,
     Offer(u64),
+    /// Smallest partial fill (in buy-token units) the maker accepts.
+    MinFill(u64),
 }
 
 #[contracterror]
@@ -69,6 +71,8 @@ pub enum Error {
     PartialNotAllowed = 7,
     InvalidAmount = 8,
     NotExpired = 9,
+    /// A partial fill below the maker's minimum (the final remainder is exempt).
+    FillTooSmall = 10,
 }
 
 #[contractevent(topics = ["swap", "offered"])]
@@ -87,6 +91,14 @@ pub struct Filled {
     pub taker: Address,
     pub paid: i128,
     pub received: i128,
+}
+
+#[contractevent(topics = ["swap", "repriced"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Repriced {
+    #[topic]
+    pub offer_id: u64,
+    pub buy_amount: i128,
 }
 
 #[contractevent(topics = ["swap", "closed"])]
@@ -188,6 +200,10 @@ impl Swapdesk {
         if pay_amount < offer.buy_remaining && !offer.allow_partial {
             return Err(Error::PartialNotAllowed);
         }
+        // Dust fills can't fragment an offer; the last remainder is always fillable.
+        if pay_amount < offer.buy_remaining && pay_amount < min_fill(&env, offer_id) {
+            return Err(Error::FillTooSmall);
+        }
 
         // The final fill takes whatever escrow is left, so rounding dust
         // never gets stuck. Partial fills round down (in the maker's favour).
@@ -242,6 +258,68 @@ impl Swapdesk {
     pub fn get_offer(env: Env, offer_id: u64) -> Result<Offer, Error> {
         load(&env, offer_id)
     }
+
+    /// Set the smallest partial fill (in buy-token units). Maker only.
+    pub fn set_min_fill(env: Env, offer_id: u64, min_fill: i128) -> Result<(), Error> {
+        let offer = load(&env, offer_id)?;
+        offer.maker.require_auth();
+        if offer.status != OfferStatus::Open {
+            return Err(Error::NotOpen);
+        }
+        if min_fill < 0 || min_fill > offer.buy_remaining {
+            return Err(Error::InvalidAmount);
+        }
+        let key = DataKey::MinFill(offer_id);
+        env.storage().persistent().set(&key, &min_fill);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, BUMP_THRESHOLD, BUMP_TO);
+        Ok(())
+    }
+
+    pub fn min_fill(env: Env, offer_id: u64) -> i128 {
+        min_fill(&env, offer_id)
+    }
+
+    /// Change what the maker wants for the unsold remainder, keeping the
+    /// offer id and escrow. Afterwards `sell_amount`/`buy_amount` describe
+    /// the repriced remainder, which is what partial fills are priced on.
+    pub fn reprice(env: Env, offer_id: u64, buy_amount: i128) -> Result<(), Error> {
+        let mut offer = load(&env, offer_id)?;
+        offer.maker.require_auth();
+        if offer.status != OfferStatus::Open {
+            return Err(Error::NotOpen);
+        }
+        if env.ledger().timestamp() >= offer.expires_at {
+            return Err(Error::Expired);
+        }
+        if buy_amount <= 0 {
+            return Err(Error::InvalidAmount);
+        }
+        if offer.allow_partial && offer.sell_remaining.checked_mul(buy_amount).is_none() {
+            return Err(Error::InvalidAmount);
+        }
+        offer.sell_amount = offer.sell_remaining;
+        offer.buy_amount = buy_amount;
+        offer.buy_remaining = buy_amount;
+        save(&env, &offer);
+        if min_fill(&env, offer_id) > buy_amount {
+            env.storage()
+                .persistent()
+                .remove(&DataKey::MinFill(offer_id));
+        }
+        Repriced {
+            offer_id,
+            buy_amount,
+        }
+        .publish(&env);
+        Ok(())
+    }
+
+    /// Number of offers ever created; ids run from 1 to this value.
+    pub fn offer_count(env: Env) -> u64 {
+        env.storage().instance().get(&DataKey::NextId).unwrap_or(0)
+    }
 }
 
 fn close(env: &Env, mut offer: Offer) -> Result<i128, Error> {
@@ -274,12 +352,21 @@ fn load(env: &Env, id: u64) -> Result<Offer, Error> {
         .ok_or(Error::OfferNotFound)
 }
 
+fn min_fill(env: &Env, offer_id: u64) -> i128 {
+    env.storage()
+        .persistent()
+        .get(&DataKey::MinFill(offer_id))
+        .unwrap_or(0)
+}
+
 fn save(env: &Env, offer: &Offer) {
     let key = DataKey::Offer(offer.id);
     env.storage().persistent().set(&key, offer);
     env.storage()
         .persistent()
         .extend_ttl(&key, BUMP_THRESHOLD, BUMP_TO);
+    // The instance holds the id counter; keep it alive on every write.
+    env.storage().instance().extend_ttl(BUMP_THRESHOLD, BUMP_TO);
 }
 
 fn next_id(env: &Env) -> u64 {

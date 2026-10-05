@@ -227,3 +227,51 @@ fn unknown_offers() {
         Err(Ok(Error::OfferNotFound))
     );
 }
+
+#[test]
+fn makers_can_set_a_minimum_fill() {
+    let s = setup();
+    let id = offer(&s, None, true);
+    s.desk.set_min_fill(&id, &1_000);
+    assert_eq!(
+        s.desk.try_fill(&id, &s.taker, &999),
+        Err(Ok(Error::FillTooSmall))
+    );
+    s.desk.fill(&id, &s.taker, &84_500);
+    // 500 left: smaller than the minimum, but the final remainder is allowed.
+    s.desk.fill(&id, &s.taker, &500);
+    assert_eq!(s.desk.get_offer(&id).status, OfferStatus::Filled);
+    StellarAssetClient::new(&s.env, &s.usdc).mint(&s.maker, &10_000);
+    assert_eq!(
+        s.desk.try_set_min_fill(&offer(&s, None, true), &90_000),
+        Err(Ok(Error::InvalidAmount))
+    );
+}
+
+#[test]
+fn reprice_keeps_the_id_and_escrow() {
+    let s = setup();
+    let id = offer(&s, None, true);
+    s.desk.fill(&id, &s.taker, &8_500); // buys 1,000 USDC at the old price
+    s.desk.reprice(&id, &90_000); // 9,000 USDC left, now for 90,000 XLM
+    let o = s.desk.get_offer(&id);
+    assert_eq!((o.sell_remaining, o.buy_remaining), (9_000, 90_000));
+    assert_eq!(s.usdc_c.balance(&s.desk.address), 9_000);
+    assert_eq!(s.desk.fill(&id, &s.taker, &10_000), 1_000); // new price: 10 XLM per USDC
+    assert_eq!(s.desk.try_reprice(&id, &0), Err(Ok(Error::InvalidAmount)));
+}
+
+#[test]
+fn offer_count_and_instance_stay_live_with_fills_only() {
+    let s = setup();
+    let id = offer(&s, None, true);
+    assert_eq!(s.desk.offer_count(), 1);
+    s.env
+        .ledger()
+        .with_mut(|l| l.sequence_number += 100 * DAY_IN_LEDGERS);
+    s.desk.fill(&id, &s.taker, &8_500);
+    s.env
+        .ledger()
+        .with_mut(|l| l.sequence_number += 100 * DAY_IN_LEDGERS);
+    assert_eq!(s.desk.offer_count(), 1);
+}
