@@ -36,22 +36,27 @@ buyer at an agreed price, without slippage or an order book.
 | `cancel(offer_id)` | maker | Refunds the remaining escrow |
 | `reclaim_expired(offer_id)` | anyone | After expiry; refunds the maker |
 | `get_offer(offer_id)` | anyone | Includes `sell_remaining` / `buy_remaining` |
+| `set_min_fill(offer_id, min_fill)` | maker | Smallest partial fill (buy-token units); the final remainder is exempt |
+| `reprice(offer_id, buy_amount)` | maker | New price for the unsold remainder; keeps the id and escrow |
+| `offer_count()`, `min_fill(offer_id)` | anyone | Read state |
 
 Price math for a partial fill: `received = sell_amount × pay_amount ÷ buy_amount`,
 rounded down.
 
 Errors: `OfferNotFound (1)`, `InvalidOffer (2)`, `NotOpen (3)`, `Expired (4)`,
 `NotYourOffer (5)`, `PrivateOffer (6)`, `PartialNotAllowed (7)`,
-`InvalidAmount (8)`, `NotExpired (9)`.
+`InvalidAmount (8)`, `NotExpired (9)`, `FillTooSmall (10)`.
 
 Events: `("swap","offered", id)`, `("swap","filled", id)` (with paid and
-received amounts), `("swap","closed", id)` (with the refund).
+received amounts), `("swap","closed", id)` (with the refund),
+`("swap","repriced", id)` (with the new buy amount). After a reprice,
+`sell_amount`/`buy_amount` describe the repriced remainder.
 
 ## Build, test and deploy
 
 ```bash
 cd contracts
-cargo test             # 12 unit tests
+cargo test             # 15 unit tests
 stellar contract build
 stellar contract deploy --wasm target/wasm32v1-none/release/swapdesk.wasm \
   --source me --network testnet
@@ -63,9 +68,23 @@ stellar contract invoke --id <DESK> --source maker --network testnet -- \
   --allow_partial false --expires_at 1767312000
 ```
 
+## Returning expired escrow
+
+`reclaim_expired` can be called by anyone and always refunds the maker.
+`scripts/reclaim.sh` finds expired open offers and reclaims them; run it from cron:
+
+```bash
+scripts/reclaim.sh <CONTRACT_ID> keeper --network testnet --dry-run   # list them
+scripts/reclaim.sh <CONTRACT_ID> keeper --network testnet             # reclaim
+```
+
 ## Web app
 
 ![Swapdesk web app](docs/assets/web-app.png)
+
+The site has three pages: **Home** (what it does, with live testnet data), **App** (the tool itself) and **Docs** (getting started, concepts, reference and FAQ).
+
+![swapdesk app page](docs/assets/web-app-page.png)
 
 An OTC trading desk at `web/`:
 
