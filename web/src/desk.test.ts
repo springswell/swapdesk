@@ -14,3 +14,4 @@ describe("receiveFor mirrors the contract", () => {
     expect(receiveFor(o, 4n)).toBe(0n);
   });
 });
+// desk.ts unit tests
