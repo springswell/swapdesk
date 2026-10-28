@@ -6,3 +6,4 @@ target
 test_snapshots
 package-lock.json
 Cargo.lock
+contracts/
