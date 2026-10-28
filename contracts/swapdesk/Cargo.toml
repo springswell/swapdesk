@@ -1,3 +1,4 @@
+# See contracts/ for build instructions
 [package]
 name = "swapdesk"
 version = "0.1.0"
