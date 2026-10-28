@@ -1,3 +1,4 @@
+// See web/.env.example for env vars
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
