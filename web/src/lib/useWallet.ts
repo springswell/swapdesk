@@ -27,3 +27,4 @@ export function useWallet() {
 
   return { address, connect, connecting, error, disconnect: () => setAddress(null) };
 }
+// wallet hook
