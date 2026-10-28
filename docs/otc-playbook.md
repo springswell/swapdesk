@@ -18,3 +18,7 @@ end.
 
 Compare `sell_token` / `buy_token` against the issuer's published Stellar
 Asset Contract address (derived from `CODE:ISSUER`), never just the code.
+
+## Troubleshooting
+
+See [README.md](../README.md) for common issues.
