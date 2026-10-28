@@ -45,3 +45,5 @@ privacy will be respected.
 
 Adapted from the [Contributor Covenant](https://www.contributor-covenant.org),
 version 2.1.
+
+<!-- contact: conduct@swapdesk.example -->
