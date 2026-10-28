@@ -43,3 +43,7 @@ Use the issue templates under **New issue**. For security problems, follow
 ## Code of conduct
 
 This project follows the [Code of Conduct](./CODE_OF_CONDUCT.md).
+
+## Running tests
+
+Run `cargo test` for Rust and `npm test` for TypeScript.
