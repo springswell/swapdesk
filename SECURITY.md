@@ -23,3 +23,7 @@ Anything in this repository, especially escrow accounting, fill math and roundin
 
 Only the latest commit on `main` is supported. There are no tagged
 releases yet, so fixes land on `main`.
+
+## Disclosure timeline
+
+We aim to respond within 90 days.
