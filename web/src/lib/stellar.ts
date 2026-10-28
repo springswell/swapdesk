@@ -166,3 +166,4 @@ export async function deployContract(source: string, wasmHashHex: string): Promi
   const { hash, result } = await submit(signed.signedTxXdr);
   return { hash, contractId: String(result) };
 }
+// end stellar.ts
