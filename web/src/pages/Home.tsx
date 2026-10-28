@@ -187,3 +187,4 @@ const PROMISES: [string, string][] = [
     "Cancel an open offer to get the unsold remainder back straight away."
   ]
 ];
+// Home landing page
