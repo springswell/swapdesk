@@ -9,3 +9,4 @@ createRoot(document.getElementById("root")!).render(
     <App />
   </StrictMode>,
 );
+// app entry point
