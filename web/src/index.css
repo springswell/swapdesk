@@ -27,3 +27,4 @@ body { background: var(--color-void); color: var(--color-glow); font-family: var
   .key-dim { border: 1px solid var(--color-seam); color: var(--color-glow); }
   .tag { font-family: var(--font-mono); font-size: .65rem; letter-spacing: .08em; text-transform: uppercase; padding: .15rem .45rem; border-radius: 4px; }
 }
+/* swapdesk styles */
