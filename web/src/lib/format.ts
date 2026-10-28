@@ -35,3 +35,4 @@ export const dateOf = (unixSeconds: bigint | number) =>
   new Date(Number(unixSeconds) * 1000).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 
 export const XLM = UNIT;
+// end of format.ts
