@@ -1,3 +1,4 @@
+// See https://eslint.org/docs/latest/
 import js from "@eslint/js";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
