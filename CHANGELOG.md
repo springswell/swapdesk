@@ -16,3 +16,10 @@ All notable changes to this project are documented here. The format follows
 ### Added
 
 - Initial release of Swapdesk: a trustless OTC token swap contract with escrowed offers.
+
+## [Unreleased]
+
+## [0.1.0] - 2025-01-01
+
+### Added
+- Initial swapdesk OTC contract
