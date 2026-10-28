@@ -35,3 +35,5 @@ and no partial state is written.
 - `cancel`: maker only, any time while open.
 - `reclaim_expired`: anyone, after expiry. The refund always goes to the
   maker, so letting anyone trigger it is safe and stops tokens being stranded.
+
+<!-- TODO: add Mermaid diagram -->
