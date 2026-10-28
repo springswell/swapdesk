@@ -93,3 +93,4 @@ export function symbolOf(token: string): Promise<string> {
   }
   return symbols.get(token)!;
 }
+// end desk.ts
