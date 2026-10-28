@@ -12,3 +12,7 @@ commands in the README and update `web/.env.example` if these stop resolving.
 
 Deployed 2026-10-04. Native XLM's asset contract on testnet is
 `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC`.
+
+## Next steps
+
+See [otc-playbook.md](otc-playbook.md) for post-deployment guidance.
