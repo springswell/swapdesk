@@ -373,3 +373,4 @@ function CreateOffer({ wallet, onCreated }: { wallet: Wallet; onCreated: (id: bi
     </form>
   );
 }
+// end Workspace
