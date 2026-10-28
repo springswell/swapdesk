@@ -8,3 +8,4 @@
 package-lock.json linguist-generated=true -diff
 Cargo.lock linguist-generated=true -diff
 test_snapshots/** linguist-generated=true
+*.rs text eol=lf
